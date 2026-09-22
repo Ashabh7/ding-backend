@@ -3,6 +3,10 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
+const foodRoutes = require('./routes/foodRoutes')
+const userRoutes = require('./routes/userRoutes')
+const restaurantRoutes = require('./routes/restaurantRoutes')
+
 const app = express();
 
 mongoose
@@ -12,6 +16,9 @@ mongoose
 
 app.use(cors());
 app.use(express.json());
+app.use(foodRoutes)
+app.use(userRoutes)
+app.use(restaurantRoutes)
 
 app.get("/", (req, res) => {
   res.json({ message: "Ding! API is Running" });
