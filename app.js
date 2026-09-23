@@ -6,6 +6,7 @@ const cors = require("cors");
 const foodRoutes = require('./routes/foodRoutes')
 const userRoutes = require('./routes/userRoutes')
 const restaurantRoutes = require('./routes/restaurantRoutes')
+const orderRoutes = require('./routes/orderRoutes')
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use(express.json());
 app.use(foodRoutes)
 app.use(userRoutes)
 app.use(restaurantRoutes)
+app.use(orderRoutes)
 
 app.get("/", (req, res) => {
   res.json({ message: "Ding! API is Running" });
