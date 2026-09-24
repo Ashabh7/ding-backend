@@ -61,6 +61,10 @@ router.post("/login", async (req, res) => {
         process.env.JWT_SECRET,
         { expiresIn: "7d" },
       );
+      res.json({
+        message: "Login Successful",
+        token: token,
+      });
     } else {
       return res
         .status(401)
