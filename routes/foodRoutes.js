@@ -1,10 +1,11 @@
 const express = require("express");
 const Food = require("../models/Food");
+const authMiddleware = require('../middleware/authMiddleware')
 
 const router = express.Router();
 
 //Get the food
-router.get("/foods", async (req, res) => {
+router.get("/foods",authMiddleware, async (req, res) => {
   try {
     const foods = await Food.find();
     res.json(foods);
