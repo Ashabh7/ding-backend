@@ -1,6 +1,7 @@
 const express = require("express");
 const Order = require("../models/Order");
 const Restaurant = require("../models/Restaurant");
+const Food = require("../models/Food");
 const authMiddleware = require("../middleware/authMiddleware");
 const roleMiddleware = require("../middleware/roleMiddleware");
 
@@ -87,9 +88,43 @@ router.post(
   roleMiddleware(["customer"]),
   async (req, res) => {
     try {
+      const restaurant = await Restaurant.findById(req.body.restaurant);
+
+      if (!restaurant) {
+        return res.status(404).json({
+          message: "Restaurant not found",
+        });
+      }
+
+      const orderItems = await Promise.all(
+        req.body.items.map(async (item) => {
+          const food = await Food.findById(item.food);
+
+          if (!food) {
+            throw new Error("Food not found");
+          }
+
+          if (food.restaurant.toString() !== restaurant._id.toString()) {
+            throw new Error("Food does not belong to this restaurant");
+          }
+
+          return {
+            food: food._id,
+            quantity: item.quantity,
+            price: food.price,
+          };
+        }),
+      );
+
+      const totalAmount = orderItems.reduce((total, item) => {
+        return total + item.price * item.quantity;
+      }, 0);
+
       const newOrder = new Order({
-        ...req.body,
         user: req.user.id,
+        restaurant: restaurant._id,
+        items: orderItems,
+        totalAmount: totalAmount,
       });
 
       await newOrder.save();
@@ -162,6 +197,7 @@ router.put("/orders/:id", authMiddleware, async (req, res) => {
       { status },
       { new: true },
     );
+
     res.json(updatedOrder);
   } catch (err) {
     res.status(500).json({ message: err.message });
