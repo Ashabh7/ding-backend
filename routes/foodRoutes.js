@@ -1,8 +1,8 @@
 const express = require("express");
 const Food = require("../models/Food");
+const Restaurant = require("../models/Restaurant");
 const authMiddleware = require("../middleware/authMiddleware");
 const roleMiddleware = require("../middleware/roleMiddleware");
-const Restaurant = require("../models/Restaurant");
 
 const router = express.Router();
 
