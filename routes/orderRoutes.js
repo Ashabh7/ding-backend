@@ -88,6 +88,14 @@ router.post(
   roleMiddleware(["customer"]),
   async (req, res) => {
     try {
+      const { items } = req.body;
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({
+          message: "Order must contain at least one item",
+        });
+      }
+
       const restaurant = await Restaurant.findById(req.body.restaurant);
 
       if (!restaurant) {
@@ -97,17 +105,32 @@ router.post(
       }
 
       const orderItems = await Promise.all(
-        req.body.items.map(async (item) => {
+        items.map(async (item) => {
+          if (!item.food) {
+            const error = new Error("Food is required");
+            error.status = 400;
+            throw error;
+          }
+
+          if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+            const error = new Error("Quantity must be a positive integer");
+            error.status = 400;
+            throw error;
+          }
+
           const food = await Food.findById(item.food);
 
           if (!food) {
-            throw new Error("Food not found");
+            const error = new Error("Food not found");
+            error.status = 404;
+            throw error;
           }
 
           if (food.restaurant.toString() !== restaurant._id.toString()) {
-            throw new Error("Food does not belong to this restaurant");
+            const error = new Error("Food does not belong to this restaurant");
+            error.status = 400;
+            throw error;
           }
-
           return {
             food: food._id,
             quantity: item.quantity,
@@ -131,7 +154,9 @@ router.post(
 
       res.json(newOrder);
     } catch (err) {
-      res.status(500).json({ message: err.message });
+      res.status(err.status || 500).json({
+        message: err.message,
+      });
     }
   },
 );
