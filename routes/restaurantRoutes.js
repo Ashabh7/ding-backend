@@ -48,7 +48,15 @@ router.put(
   roleMiddleware(["restaurant", "admin"]),
   async (req, res) => {
     try {
+      
       const restaurant = await Restaurant.findById(req.params.id);
+
+      if (!restaurant) {
+        return res.status(404).json({
+          message: "Restaurant not found",
+        });
+      }
+
       if (
         req.user.role !== "admin" &&
         restaurant.owner.toString() !== req.user.id
@@ -71,13 +79,43 @@ router.put(
 );
 
 //Delete the Restaurant
-router.delete("/restaurants/:id", async (req, res) => {
-  try {
-    await Restaurant.findByIdAndDelete(req.params.id);
-    res.json({ message: "Restaurant Deleted" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
+// Delete the Restaurant
+router.delete(
+  "/restaurants/:id",
+  authMiddleware,
+  roleMiddleware(["restaurant", "admin"]),
+  async (req, res) => {
+    try {
+      const restaurant = await Restaurant.findById(req.params.id);
+
+      if (!restaurant) {
+        return res.status(404).json({
+          message: "Restaurant not found",
+        });
+      }
+
+      // Admin can delete any restaurant
+      // Restaurant can delete only their own restaurant
+      if (
+        req.user.role !== "admin" &&
+        restaurant.owner.toString() !== req.user.id
+      ) {
+        return res.status(403).json({
+          message: "You can only delete your own restaurant",
+        });
+      }
+
+      await Restaurant.findByIdAndDelete(req.params.id);
+
+      res.json({
+        message: "Restaurant Deleted",
+      });
+    } catch (err) {
+      res.status(500).json({
+        message: err.message,
+      });
+    }
+  },
+);
 
 module.exports = router;

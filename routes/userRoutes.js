@@ -22,31 +22,27 @@ router.get(
 );
 
 // Get User by ID - Own profile or Admin
-router.get(
-  "/users/:id",
-  authMiddleware,
-  async (req, res) => {
-    try {
-      if (req.user.role !== "admin" && req.user.id !== req.params.id) {
-        return res.status(403).json({
-          message: "You can only view your own profile",
-        });
-      }
-
-      const user = await User.findById(req.params.id).select("-password");
-
-      if (!user) {
-        return res.status(404).json({
-          message: "User not found",
-        });
-      }
-
-      res.json(user);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
+router.get("/users/:id", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin" && req.user.id !== req.params.id) {
+      return res.status(403).json({
+        message: "You can only view your own profile",
+      });
     }
-  },
-);
+
+    const user = await User.findById(req.params.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // Register User - Public
 router.post("/users", async (req, res) => {
@@ -54,8 +50,10 @@ router.post("/users", async (req, res) => {
     const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
     const newUser = new User({
-      ...req.body,
+      name: req.body.name,
+      email: req.body.email,
       password: hashedPassword,
+      role: "customer",
     });
 
     await newUser.save();
@@ -104,77 +102,65 @@ router.post("/login", async (req, res) => {
 });
 
 // Update User - Own profile or Admin
-router.put(
-  "/users/:id",
-  authMiddleware,
-  async (req, res) => {
-    try {
-      if (req.user.role !== "admin" && req.user.id !== req.params.id) {
-        return res.status(403).json({
-          message: "You can only edit your own profile",
-        });
-      }
-
-      const updates = { ...req.body };
-
-      // Prevent non-admin users from changing their role
-      if (req.user.role !== "admin") {
-        delete updates.role;
-      }
-
-      // Hash password if password is being changed
-      if (updates.password) {
-        updates.password = await bcrypt.hash(updates.password, 10);
-      }
-
-      const updatedUser = await User.findByIdAndUpdate(
-        req.params.id,
-        updates,
-        {
-          new: true,
-        },
-      ).select("-password");
-
-      if (!updatedUser) {
-        return res.status(404).json({
-          message: "User not found",
-        });
-      }
-
-      res.json(updatedUser);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
+router.put("/users/:id", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin" && req.user.id !== req.params.id) {
+      return res.status(403).json({
+        message: "You can only edit your own profile",
+      });
     }
-  },
-);
+
+    const updates = { ...req.body };
+
+    // Prevent non-admin users from changing their role
+    if (req.user.role !== "admin") {
+      delete updates.role;
+    }
+
+    // Hash password if password is being changed
+    if (updates.password) {
+      updates.password = await bcrypt.hash(updates.password, 10);
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(req.params.id, updates, {
+      new: true,
+    }).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    res.json(updatedUser);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // Delete User - Own account or Admin
-router.delete(
-  "/users/:id",
-  authMiddleware,
-  async (req, res) => {
-    try {
-      if (req.user.role !== "admin" && req.user.id !== req.params.id) {
-        return res.status(403).json({
-          message: "You can only delete your own account",
-        });
-      }
-
-      const deletedUser = await User.findByIdAndDelete(req.params.id);
-
-      if (!deletedUser) {
-        return res.status(404).json({
-          message: "User not found",
-        });
-      }
-
-      res.json({
-        message: "User Deleted",
+router.delete("/users/:id", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin" && req.user.id !== req.params.id) {
+      return res.status(403).json({
+        message: "You can only delete your own account",
       });
-    } catch (err) {
-      res.status(500).json({ message: err.message });
     }
-  },
-);
+
+    const deletedUser = await User.findByIdAndDelete(req.params.id);
+
+    if (!deletedUser) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    res.json({
+      message: "User Deleted",
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 module.exports = router;

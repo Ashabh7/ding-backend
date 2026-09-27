@@ -7,7 +7,7 @@ const roleMiddleware = require("../middleware/roleMiddleware");
 const router = express.Router();
 
 //Get the food
-router.get("/foods", authMiddleware, async (req, res) => {
+router.get("/foods", async (req, res) => {
   try {
     const foods = await Food.find();
     res.json(foods);
@@ -127,7 +127,7 @@ router.put(
         req.params.id,
         req.body,
         {
-          new: true, //So that the MongoDB returns the uppdated value, otherwise returns the old value.
+          new: true, //So that the Mongoose returns the updated value, otherwise returns the old value.
         },
       );
       res.json(updatedFood);
