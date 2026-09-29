@@ -13,7 +13,9 @@ router.get("/orders", authMiddleware, async (req, res) => {
     let orders;
 
     if (req.user.role === "customer") {
-      orders = await Order.find({ user: req.user.id });
+      orders = await Order.find({ user: req.user.id })
+        .populate("restaurant", "name")
+        .populate("items.food", "name price");
     } else if (req.user.role === "restaurant") {
       const restaurant = await Restaurant.findOne({
         owner: req.user.id,
@@ -27,9 +29,13 @@ router.get("/orders", authMiddleware, async (req, res) => {
 
       orders = await Order.find({
         restaurant: restaurant._id,
-      });
+      })
+        .populate("restaurant", "name")
+        .populate("items.food", "name price");
     } else if (req.user.role === "admin") {
-      orders = await Order.find();
+      orders = await Order.find()
+        .populate("restaurant", "name")
+        .populate("items.food", "name price");
     }
 
     res.json(orders);
@@ -131,6 +137,7 @@ router.post(
             error.status = 400;
             throw error;
           }
+
           return {
             food: food._id,
             quantity: item.quantity,
@@ -274,7 +281,9 @@ router.delete("/orders/:id", authMiddleware, async (req, res) => {
       message: "Order Deleted",
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({
+      message: err.message,
+    });
   }
 });
 
