@@ -163,4 +163,32 @@ router.delete("/users/:id", authMiddleware, async (req, res) => {
   }
 });
 
+//Admin can only create restaurant role for a user
+router.post(
+  "/restaurant-users",
+  authMiddleware,
+  roleMiddleware(["admin"]),
+  async (req, res) => {
+    try {
+      const hashedPassword = await bcrypt.hash(req.body.password, 10);
+
+      const newUser = new User({
+        name: req.body.name,
+        email: req.body.email,
+        password: hashedPassword,
+        role: "restaurant",
+      });
+
+      await newUser.save();
+
+      const userResponse = newUser.toObject();
+      delete userResponse.password;
+
+      res.json(userResponse);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  },
+);
+
 module.exports = router;
