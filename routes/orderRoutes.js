@@ -155,8 +155,8 @@ router.post(
         restaurant: restaurant._id,
         items: orderItems,
         totalAmount: totalAmount,
+        deliveryAddress: req.body.deliveryAddress,
       });
-
       await newOrder.save();
 
       res.json(newOrder);

@@ -32,6 +32,10 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  deliveryAddress: {
+    type: String,
+    required: true,
+  },
   status: {
     type: String,
     enum: [
