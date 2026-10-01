@@ -102,7 +102,25 @@ router.post(
         });
       }
 
-      const restaurant = await Restaurant.findById(req.body.restaurant);
+      if (!req.body.deliveryAddress?.trim()) {
+        return res.status(400).json({
+          message: "Delivery address is required",
+        });
+      }
+
+      let restaurant;
+
+      try {
+        restaurant = await Restaurant.findById(req.body.restaurant);
+      } catch (err) {
+        if (err.name === "CastError") {
+          return res.status(400).json({
+            message: "Invalid restaurant ID",
+          });
+        }
+
+        throw err;
+      }
 
       if (!restaurant) {
         return res.status(404).json({
@@ -124,7 +142,19 @@ router.post(
             throw error;
           }
 
-          const food = await Food.findById(item.food);
+          let food;
+
+          try {
+            food = await Food.findById(item.food);
+          } catch (err) {
+            if (err.name === "CastError") {
+              const error = new Error("Invalid food ID");
+              error.status = 400;
+              throw error;
+            }
+
+            throw err;
+          }
 
           if (!food) {
             const error = new Error("Food not found");
@@ -157,6 +187,7 @@ router.post(
         totalAmount: totalAmount,
         deliveryAddress: req.body.deliveryAddress,
       });
+
       await newOrder.save();
 
       res.json(newOrder);

@@ -1,12 +1,12 @@
 const express = require("express");
 const User = require("../models/User");
+const Restaurant = require("../models/Restaurant");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const authMiddleware = require("../middleware/authMiddleware");
 const roleMiddleware = require("../middleware/roleMiddleware");
 
-// Get all Users - Admin only
 router.get(
   "/users",
   authMiddleware,
@@ -21,7 +21,6 @@ router.get(
   },
 );
 
-// Get User by ID - Own profile or Admin
 router.get("/users/:id", authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== "admin" && req.user.id !== req.params.id) {
@@ -44,14 +43,33 @@ router.get("/users/:id", authMiddleware, async (req, res) => {
   }
 });
 
-// Register User - Public
 router.post("/users", async (req, res) => {
   try {
-    const hashedPassword = await bcrypt.hash(req.body.password, 10);
+    const { name, email, password } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        message: "Name is required",
+      });
+    }
+
+    if (!email?.trim()) {
+      return res.status(400).json({
+        message: "Email is required",
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        message: "Password is required",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new User({
-      name: req.body.name,
-      email: req.body.email,
+      name,
+      email,
       password: hashedPassword,
       role: "customer",
     });
@@ -63,11 +81,16 @@ router.post("/users", async (req, res) => {
 
     res.json(userResponse);
   } catch (err) {
+    if (err.code === 11000 && err.keyPattern?.email) {
+      return res.status(400).json({
+        message: "Email already exists",
+      });
+    }
+
     res.status(500).json({ message: err.message });
   }
 });
 
-// Login - Public
 router.post("/login", async (req, res) => {
   try {
     const user = await User.findOne({ email: req.body.email });
@@ -101,7 +124,6 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Update User - Own profile or Admin
 router.put("/users/:id", authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== "admin" && req.user.id !== req.params.id) {
@@ -112,12 +134,10 @@ router.put("/users/:id", authMiddleware, async (req, res) => {
 
     const updates = { ...req.body };
 
-    // Prevent non-admin users from changing their role
     if (req.user.role !== "admin") {
       delete updates.role;
     }
 
-    // Hash password if password is being changed
     if (updates.password) {
       updates.password = await bcrypt.hash(updates.password, 10);
     }
@@ -134,11 +154,16 @@ router.put("/users/:id", authMiddleware, async (req, res) => {
 
     res.json(updatedUser);
   } catch (err) {
+    if (err.code === 11000 && err.keyPattern?.email) {
+      return res.status(400).json({
+        message: "Email already exists",
+      });
+    }
+
     res.status(500).json({ message: err.message });
   }
 });
 
-// Delete User - Own account or Admin
 router.delete("/users/:id", authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== "admin" && req.user.id !== req.params.id) {
@@ -159,34 +184,103 @@ router.delete("/users/:id", authMiddleware, async (req, res) => {
       message: "User Deleted",
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({
+      message: err.message,
+    });
   }
 });
 
-//Admin can only create restaurant role for a user
 router.post(
   "/restaurant-users",
   authMiddleware,
   roleMiddleware(["admin"]),
   async (req, res) => {
     try {
-      const hashedPassword = await bcrypt.hash(req.body.password, 10);
+      const { name, email, password, restaurantName, street, city, pincode } =
+        req.body;
+
+      if (!name?.trim()) {
+        return res.status(400).json({
+          message: "Owner name is required",
+        });
+      }
+
+      if (!email?.trim()) {
+        return res.status(400).json({
+          message: "Email is required",
+        });
+      }
+
+      if (!password) {
+        return res.status(400).json({
+          message: "Password is required",
+        });
+      }
+
+      if (!restaurantName?.trim()) {
+        return res.status(400).json({
+          message: "Restaurant name is required",
+        });
+      }
+
+      if (!street?.trim()) {
+        return res.status(400).json({
+          message: "Street is required",
+        });
+      }
+
+      if (!city?.trim()) {
+        return res.status(400).json({
+          message: "City is required",
+        });
+      }
+
+      if (!pincode?.trim()) {
+        return res.status(400).json({
+          message: "Pincode is required",
+        });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
 
       const newUser = new User({
-        name: req.body.name,
-        email: req.body.email,
+        name,
+        email,
         password: hashedPassword,
         role: "restaurant",
       });
 
       await newUser.save();
 
+      const newRestaurant = new Restaurant({
+        name: restaurantName,
+        owner: newUser._id,
+        location: {
+          street,
+          city,
+          pincode,
+        },
+      });
+
+      await newRestaurant.save();
+
       const userResponse = newUser.toObject();
       delete userResponse.password;
 
-      res.json(userResponse);
+      res.json({
+        user: userResponse,
+        restaurant: newRestaurant,
+      });
     } catch (err) {
-      res.status(500).json({ message: err.message });
+      if (err.code === 11000 && err.keyPattern?.email) {
+        return res.status(400).json({
+          message: "Email already exists",
+        });
+      }
+
+      res.status(500).json({
+        message: err.message,
+      });
     }
   },
 );
