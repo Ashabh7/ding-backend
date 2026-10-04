@@ -254,6 +254,7 @@ router.post(
 
       const newRestaurant = new Restaurant({
         name: restaurantName,
+        image: image || "",
         owner: newUser._id,
         location: {
           street,
