@@ -1,9 +1,34 @@
 const express = require("express");
+const { Readable } = require("stream");
+
 const Restaurant = require("../models/Restaurant");
 const authMiddleware = require("../middleware/authMiddleware");
 const roleMiddleware = require("../middleware/roleMiddleware");
+const upload = require("../middleware/upload");
+const cloudinary = require("../config/cloudinary");
 
 const router = express.Router();
+
+// Upload an image buffer to Cloudinary
+function uploadToCloudinary(buffer) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "ding/restaurants",
+        resource_type: "image",
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(result);
+        }
+      },
+    );
+
+    Readable.from(buffer).pipe(stream);
+  });
+}
 
 // Get all restaurants
 router.get("/restaurants", async (req, res) => {
@@ -71,7 +96,7 @@ router.post(
   roleMiddleware(["admin"]),
   async (req, res) => {
     try {
-      const { name, image, owner, location } = req.body;
+      const { name, image, owner, location } = req.body || {};
 
       if (!name?.trim()) {
         return res.status(400).json({
@@ -96,30 +121,34 @@ router.post(
       }
 
       const newRestaurant = new Restaurant({
-        name,
+        name: name.trim(),
         image: image || "",
         owner,
         location: {
-          street: location.street,
-          city: location.city,
-          pincode: location.pincode,
+          street: location.street.trim(),
+          city: location.city.trim(),
+          pincode: location.pincode.trim(),
         },
       });
 
       await newRestaurant.save();
 
-      res.json(newRestaurant);
+      res.status(201).json(newRestaurant);
     } catch (err) {
-      res.status(500).json({ message: err.message });
+      console.error("Create restaurant error:", err);
+      res.status(500).json({
+        message: "Failed to create restaurant",
+      });
     }
   },
 );
 
-// Update restaurant
+// Update restaurant, including optional image upload
 router.put(
   "/restaurants/:id",
   authMiddleware,
   roleMiddleware(["restaurant", "admin"]),
+  upload.single("image"),
   async (req, res) => {
     try {
       const restaurant = await Restaurant.findById(req.params.id);
@@ -139,11 +168,13 @@ router.put(
         });
       }
 
-      const { name, image, location } = req.body;
+      const body = req.body || {};
+      const { name } = body;
       const updates = {};
 
+      // Update restaurant name
       if (name !== undefined) {
-        if (!name.trim()) {
+        if (typeof name !== "string" || !name.trim()) {
           return res.status(400).json({
             message: "Restaurant name cannot be empty",
           });
@@ -152,15 +183,55 @@ router.put(
         updates.name = name.trim();
       }
 
-      if (image !== undefined) {
-        updates.image = image.trim();
+      // Upload a newly selected image to Cloudinary
+      if (req.file) {
+        const result = await uploadToCloudinary(req.file.buffer);
+        updates.image = result.secure_url;
+      } else if (body.image !== undefined) {
+        // Support existing URL-based image updates
+        if (typeof body.image !== "string") {
+          return res.status(400).json({
+            message: "Invalid restaurant image URL",
+          });
+        }
+
+        updates.image = body.image.trim();
+      }
+
+      // Support JSON location objects and FormData fields
+      let location = body.location;
+
+      if (typeof location === "string") {
+        try {
+          location = JSON.parse(location);
+        } catch {
+          return res.status(400).json({
+            message: "Invalid location data",
+          });
+        }
+      }
+
+      if (
+        body.street !== undefined ||
+        body.city !== undefined ||
+        body.pincode !== undefined
+      ) {
+        location = {
+          street: body.street,
+          city: body.city,
+          pincode: body.pincode,
+        };
       }
 
       if (location !== undefined) {
         if (
-          !location.street?.trim() ||
-          !location.city?.trim() ||
-          !location.pincode?.trim()
+          !location ||
+          typeof location.street !== "string" ||
+          typeof location.city !== "string" ||
+          typeof location.pincode !== "string" ||
+          !location.street.trim() ||
+          !location.city.trim() ||
+          !location.pincode.trim()
         ) {
           return res.status(400).json({
             message: "Complete restaurant location is required",
@@ -172,6 +243,12 @@ router.put(
           city: location.city.trim(),
           pincode: location.pincode.trim(),
         };
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({
+          message: "No restaurant changes provided",
+        });
       }
 
       const updatedRestaurant = await Restaurant.findByIdAndUpdate(
@@ -191,7 +268,11 @@ router.put(
         });
       }
 
-      res.status(500).json({ message: err.message });
+      console.error("Restaurant update error:", err);
+
+      res.status(500).json({
+        message: "Failed to update restaurant",
+      });
     }
   },
 );
